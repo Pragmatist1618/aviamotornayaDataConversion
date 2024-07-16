@@ -1,0 +1,66 @@
+import pandas as pd
+from tkinter import Tk, filedialog
+import os
+
+def process_file(file_path):
+    # Создание папки "результат" если она не существует
+    output_dir = os.path.join(os.path.dirname(file_path), 'результат')
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Попробуем несколько кодировок, чтобы избежать UnicodeDecodeError
+    encodings = ['utf-8', 'latin1', 'cp1252']
+    for encoding in encodings:
+        try:
+            # Чтение CSV файла
+            df = pd.read_csv(file_path, sep=';', encoding='cp1252')
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        print("Не удалось прочитать файл с указанными кодировками.")
+        return
+
+    # Получение заголовков из первой строки исходного файла
+    headers = df.columns.tolist()
+    time_header = headers[0]
+
+    # Инициализация списка для хранения результирующей строки
+    result_data = []
+
+    # Проходим по каждой группе из 16 строк и собираем значения
+    for i in range(0, len(df), 16):
+        row_values = [df.iloc[i, 0]]  # Начинаем с первой временной метки группы
+        for j in range(1, len(headers)):
+            value_found = False
+            for k in range(i, min(i + 16, len(df))):
+                if pd.notna(df.iloc[k, j]) and df.iloc[k, j] != '':
+                    row_values.append(df.iloc[k, j])
+                    value_found = True
+                    break
+            if not value_found:
+                row_values.append(0)
+        result_data.append(row_values)
+
+    # Создаем DataFrame с результатами
+    result_df = pd.DataFrame(result_data, columns=headers)
+
+    # Имя исходного файла
+    base_filename = os.path.basename(file_path)
+    output_path = os.path.join(output_dir, base_filename)
+
+    # Запись результата в новый CSV файл с кодировкой utf-8-sig
+    result_df.to_csv(output_path, sep=';', index=False, encoding='cp1252')
+
+    print(f"Данные успешно преобразованы и записаны в {output_path}")
+
+def select_file():
+    root = Tk()
+    root.withdraw()  # Скрыть основное окно
+    file_path = filedialog.askopenfilename(title="Выберите CSV файл", filetypes=[("CSV files", "*.csv")])
+    if file_path:
+        process_file(file_path)
+    else:
+        print("Файл не выбран")
+
+if __name__ == "__main__":
+    select_file()
